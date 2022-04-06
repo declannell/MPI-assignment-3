@@ -15,7 +15,7 @@
 void init_full_grid(double g[][maxn]);
 void init_full_grids(double a[][maxn], double b[][maxn] ,double f[][maxn]);
 void MPE_decomp2d(int nx, int dim[2], int myid, int mycoords[2], int s[2], int e[2]);
-void twodinit_basic(double a[][maxn], double b[][maxn], double f[][maxn], int nx, int ny, int s[2], int e[2]);
+void twodinit_basic(double a[][maxn], double b[][maxn], double f[][maxn], int nx, int ny, int s[2], int e[2], int myid);
 void print_full_grid(double x[][maxn], int nx);
 void print_in_order(double x[][maxn], MPI_Comm comm, int nx);
 void  print_grid_to_file(char *fname, double x[][maxn], int nx, int ny);
@@ -102,12 +102,13 @@ int main(int argc, char **argv)
   printf(" myid is %d,(%d, %d), nbrup = %d, nbrdown = %d, nbrright = %d, nbrleft = %d,s = ( %d, %d), e = (%d,%d)\n", myid, mycoords[0], mycoords[1], nbrup, nbrdown, nbrright, nbrleft,  s[0], s[1], e[0], e[1]);  printf(" myid is %d,(%d, %d), nbrup = %d, nbrdown = %d, nbrright = %d, nbrleft = %d,s = ( %d, %d), e = (%d,%d)\n", myid, mycoords[0], mycoords[1], nbrup, nbrdown, nbrright, nbrleft,  s[0], s[1], e[0], e[1]);
 
 
-  twodinit_basic(a, b, f, nx, ny, s, e);
+  twodinit_basic(a, b, f, nx, ny, s, e, myid);
   //print_in_order(a, MPI_COMM_WORLD, nx);//this would display the boundary conditions
 
   t1 = MPI_Wtime();
+  //each window is just a vertical slice of the grid.
   MPI_Win_create(&a[s[0]-1][0], (maxn)*(e[0] - s[0] + 3)*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &wina);
-  MPI_Win_create(&b[s[0]-1][0], (maxn)*(e[0] - s[0] + 3)*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &winb);  
+  MPI_Win_create(&b[s[0]-1][0], (maxn)*(e[0] - s[0] + 3)*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &winb);
   glob_diff = 1000;
 
   for(it=0; it < maxit; it++){
@@ -201,7 +202,7 @@ void MPE_decomp2d(int nx, int dim[2], int myid, int mycoords[2], int s[2], int e
 }
 
 
-void twodinit_basic(double a[][maxn], double b[][maxn], double f[][maxn], int nx, int ny, int s[2], int e[2])
+void twodinit_basic(double a[][maxn], double b[][maxn], double f[][maxn], int nx, int ny, int s[2], int e[2], int myid)
 {
   /*This function is  edited for the analytic solution to the poisson equation.*/
 
@@ -212,8 +213,8 @@ void twodinit_basic(double a[][maxn], double b[][maxn], double f[][maxn], int nx
   /* set everything to 0 first */
   for(i = s[0] - 1; i <= e[0] + 1; i++){
     for(j = s[1] - 1; j <= e[1] + 1; j++){
-      a[i][j] = 0;
-      b[i][j] = 0;
+      a[i][j] = myid;
+      b[i][j] = myid;
       f[i][j] = 0.0;
     }
   }
