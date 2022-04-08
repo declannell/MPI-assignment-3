@@ -412,14 +412,42 @@ void exchangrma_2d(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
   MPI_Put(&x[s[0]][e[1]], 1, row_type, nbrup, offset, 1, row_type, win);//we make use of row_type and only pass 1 datatype.
 
   MPI_Win_fence(0, win);
+}
 
 
-  //MPI_Sendrecv(&x[s[0]][s[1]], 1 , row_type, nbrdown, 2, &x[s[0]][e[1]+1], 1, row_type, nbrup,
-          // 2, comm, MPI_STATUS_IGNORE);
-  //MPI_Sendrecv(&x[s[0]][e[1]], 1, row_type, nbrup, 3, &x[s[0]][s[1] - 1], 1, row_type, nbrdown,
-    //       3, comm, MPI_STATUS_IGNORE);
+void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
+                 int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group group) {
+  /* offset: avoid left ghost col and boundary condition value */
+  int num_vertical_elements = e[1] - s[1] + 1, num_horz_elements = e[0] - s[0] + 1; //This is the number of points shared across the boundary 
+
+  MPI_Datatype row_type;
+  MPI_Type_vector(num_horz_elements, 1, maxn, MPI_DOUBLE, &row_type); // We have to skip maxn as this is actually the size of the grid, not nx + 2.
+  MPI_Type_commit(&row_type);
+
+
+
+  //between two processors.
+  MPI_Aint offset;
+  MPI_Win_fence(0, win);//We can do all of these within one win fence as all act on different parts of memory.
+  // GET  from the right and above the ghost columns as we don't know the correct offsets to use puts.
+
+  offset = maxn + s[1];//same offset as 1d case
+  MPI_Get(&x[e[0]+1][s[1]], num_vertical_elements, MPI_DOUBLE, nbrright, offset, num_vertical_elements, MPI_DOUBLE, win);
+
+  offset = maxn + e[1] + 1;//We want to move 1 column in hence an offset of max n. We then want to get from e[1] + 1 up the column.
+  MPI_Get(&x[s[0]][e[1]+1], 1, row_type, nbrup, offset, 1, row_type, win);
+  
+  //Use MPI_Put to get the ghost columns for the left and the down processors as we know the correct address to put the data into the ghost. 
+  offset = s[1];
+  MPI_Put(&x[e[0]][s[1]], num_vertical_elements, MPI_DOUBLE, nbrright, offset, num_vertical_elements, MPI_DOUBLE, win);
+
+  offset = maxn + e[1];//We want to move 1 column in hence an offset of max n. We then want to place this e[1] up the column.
+  MPI_Put(&x[s[0]][e[1]], 1, row_type, nbrup, offset, 1, row_type, win);//we make use of row_type and only pass 1 datatype.
+
+  MPI_Win_fence(0, win);
 
 }
+
 
 double griddiff(double a[][maxn], double b[][maxn], int nx, int s, int e) {
   double sum = 0.0;

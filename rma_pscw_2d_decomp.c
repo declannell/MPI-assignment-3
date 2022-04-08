@@ -110,18 +110,31 @@ int main(int argc, char **argv)
   MPI_Win_create(&b[s[0]-1][0], (maxn)*(e[0] - s[0] + 3)*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &winb);
   glob_diff = 1000;
 
+  MPI_Group all_procs, edits, edited_by;
+  MPI_Comm_group(MPI_COMM_WORLD, &all_procs);
+  if (nbrright != MPI_PROC_NULL) {
+  	  int ranks[1] = {nbrright};
+ 	  printf("ranks[0] = %d, processor =%d\n", ranks[0], myid);
+      MPI_Group_incl(all_procs, 1, ranks, &edits);
+  } else { //This process will not edit another processor as nothing to its right
+	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, &edits);
+  }
 
-  for(it=0; it < maxit; it++){
+  int group_size;
+  MPI_Group_size(edits, &group_size);
+  printf("My group size is  %d for processor %d\n", group_size, myid);
+
+/*  for(it=0; it < maxit; it++){
 
     // update b using a 
     //print_in_order(a, MPI_COMM_WORLD, nx);
-    exchangrma_2d(a, ny, s, e, wina, nbrleft, nbrright, nbrup, nbrdown, MPI_COMM_WORLD);
+    exchangrma_2d_pscw(a, ny, s, e, wina, nbrleft, nbrright, nbrup, nbrdown, group);
     //print_in_order(a, MPI_COMM_WORLD, nx);
     sweep2d(a, f, nx, s, e, b);
     //print_in_order(b, MPI_COMM_WORLD, nx);
 
     // update a using b 
-    exchangrma_2d(b, ny, s, e, winb, nbrleft, nbrright, nbrup, nbrdown, MPI_COMM_WORLD);
+    exchangrma_2d_pscw(b, ny, s, e, winb, nbrleft, nbrright, nbrup, nbrdown, group);
     //print_in_order(b, MPI_COMM_WORLD, nx);
     sweep2d(b, f, nx, s, e, a);
     //print_in_order(a, MPI_COMM_WORLD, nx);
@@ -177,7 +190,7 @@ int main(int argc, char **argv)
 	printf(" The converged grid on rank 0 is \n");
 	print_full_grid(a, nx);
   }
-
+*/
  MPI_Finalize();
  return 0;
 }
