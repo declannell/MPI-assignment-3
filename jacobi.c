@@ -416,7 +416,7 @@ void exchangrma_2d(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
 
 
 void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
-                 int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group edits, MPI_Group edited_by) {
+                 int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group neighbours) {
   /* offset: avoid left ghost col and boundary condition value */
   int num_vertical_elements = e[1] - s[1] + 1, num_horz_elements = e[0] - s[0] + 1; //This is the number of points shared across the boundary 
 
@@ -429,8 +429,8 @@ void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win wi
   //between two processors.
   MPI_Aint offset;
   // GET  from the right and above the ghost columns as we don't know the correct offsets to use puts.
-  MPI_Win_post(edited_by, 0, win);
-  MPI_Win_start(edits, 0, win);
+  MPI_Win_post(neighbours, 0, win);
+  MPI_Win_start(neighbours, 0, win);
   offset = maxn + s[1];//same offset as 1d case
   MPI_Get(&x[e[0]+1][s[1]], num_vertical_elements, MPI_DOUBLE, nbrright, offset, num_vertical_elements, MPI_DOUBLE, win);
 
