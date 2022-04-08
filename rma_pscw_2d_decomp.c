@@ -21,6 +21,8 @@ void print_in_order(double x[][maxn], MPI_Comm comm, int nx);
 void  print_grid_to_file(char *fname, double x[][maxn], int nx, int ny);
 void analytic_grid(double analytic[][maxn], int nx, int ny);
 void gather_grid_2d( double a[][maxn], int nx, int size, int myid, int s[2], int e[2], MPI_Comm comm);
+void make_groups(MPI_Comm comm, MPI_Group *edits, MPI_Group *edited_by, int nbrright, int nbrleft);
+
 
 typedef struct 
 {
@@ -110,31 +112,45 @@ int main(int argc, char **argv)
   MPI_Win_create(&b[s[0]-1][0], (maxn)*(e[0] - s[0] + 3)*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &winb);
   glob_diff = 1000;
 
-  MPI_Group all_procs, edits, edited_by;
+  MPI_Group edits, edited_by;
+  make_groups(MPI_COMM_WORLD, &edits, &edited_by, nbrright, nbrleft);
+/*
   MPI_Comm_group(MPI_COMM_WORLD, &all_procs);
   if (nbrright != MPI_PROC_NULL) {
   	  int ranks[1] = {nbrright};
  	  printf("ranks[0] = %d, processor =%d\n", ranks[0], myid);
       MPI_Group_incl(all_procs, 1, ranks, &edits);
-  } else { //This process will not edit another processor as nothing to its right
+  } else { //The boundary is to the right of this processor
 	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, &edits);
   }
+  MPI_Barrier(MPI_COMM_WORLD);
 
+  if (nbrleft != MPI_PROC_NULL) {
+  	  int ranks[1] = {nbrleft};
+ 	  printf("ranks[0] = %d, processor =%d\n", ranks[0], myid);
+      MPI_Group_incl(all_procs, 1, ranks, &edited_by);
+  } else { //The boundary is to the left of this processor
+	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, &edited_by);
+  }
+*/
   int group_size;
   MPI_Group_size(edits, &group_size);
   printf("My group size is  %d for processor %d\n", group_size, myid);
 
-/*  for(it=0; it < maxit; it++){
+  MPI_Group_size(edited_by, &group_size);
+  printf("My group size is  %d for processor %d\n", group_size, myid);
+
+  for(it=0; it < maxit; it++){
 
     // update b using a 
     //print_in_order(a, MPI_COMM_WORLD, nx);
-    exchangrma_2d_pscw(a, ny, s, e, wina, nbrleft, nbrright, nbrup, nbrdown, group);
+    exchangrma_2d_pscw(a, ny, s, e, wina, nbrleft, nbrright, nbrup, nbrdown, edits, edited_by);
     //print_in_order(a, MPI_COMM_WORLD, nx);
     sweep2d(a, f, nx, s, e, b);
     //print_in_order(b, MPI_COMM_WORLD, nx);
 
     // update a using b 
-    exchangrma_2d_pscw(b, ny, s, e, winb, nbrleft, nbrright, nbrup, nbrdown, group);
+    exchangrma_2d_pscw(b, ny, s, e, winb, nbrleft, nbrright, nbrup, nbrdown, edits, edited_by);
     //print_in_order(b, MPI_COMM_WORLD, nx);
     sweep2d(b, f, nx, s, e, a);
     //print_in_order(a, MPI_COMM_WORLD, nx);
@@ -190,7 +206,7 @@ int main(int argc, char **argv)
 	printf(" The converged grid on rank 0 is \n");
 	print_full_grid(a, nx);
   }
-*/
+
  MPI_Finalize();
  return 0;
 }
@@ -368,6 +384,26 @@ void analytic_grid(double analytic[][maxn], int nx, int ny) {
   }
 
 
+void make_groups(MPI_Comm comm, MPI_Group *edits, MPI_Group *edited_by, int nbrright, int nbrleft){
+  MPI_Group all_procs;
+
+  MPI_Comm_group(comm, &all_procs);
+  if (nbrright != MPI_PROC_NULL) {
+  	  int ranks[1] = {nbrright};
+      MPI_Group_incl(all_procs, 1, ranks, edits);
+  } else { //The boundary is to the right of this processor
+	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, edits);
+  }
+
+  if (nbrleft != MPI_PROC_NULL) {
+  	  int ranks[1] = {nbrleft};
+      MPI_Group_incl(all_procs, 1, ranks, edited_by);
+  } else { //The boundary is to the left of this processor
+	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, edited_by);
+  }
+
+}
+
 
 void gather_grid_2d( double a[][maxn], int nx, int size, int myid, int s[2], int e[2], MPI_Comm comm) {
 	int i, j, k;
@@ -430,7 +466,6 @@ void gather_grid_2d( double a[][maxn], int nx, int size, int myid, int s[2], int
 			}
 		}
 	}
-
 
 
 	//This is "cheating" in an sense to get the boundary conidtion as we take them from the analytic solution.

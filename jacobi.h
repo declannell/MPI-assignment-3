@@ -27,3 +27,5 @@ void exchang3_2d_nb_sendrecv(double x[][maxn], int nx, int s[2], int e[2], MPI_C
 void exchangrma_2d(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
                  int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Comm comm);
 
+void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
+                 int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group edits, MPI_Group edited_by);

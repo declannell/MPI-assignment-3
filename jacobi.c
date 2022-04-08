@@ -416,7 +416,7 @@ void exchangrma_2d(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
 
 
 void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
-                 int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group group) {
+                 int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group edits, MPI_Group edited_by) {
   /* offset: avoid left ghost col and boundary condition value */
   int num_vertical_elements = e[1] - s[1] + 1, num_horz_elements = e[0] - s[0] + 1; //This is the number of points shared across the boundary 
 
@@ -428,15 +428,21 @@ void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win wi
 
   //between two processors.
   MPI_Aint offset;
-  MPI_Win_fence(0, win);//We can do all of these within one win fence as all act on different parts of memory.
   // GET  from the right and above the ghost columns as we don't know the correct offsets to use puts.
-
+  MPI_Win_post(edited_by, 0, win);
+  MPI_Win_start(edits, 0, win);
   offset = maxn + s[1];//same offset as 1d case
   MPI_Get(&x[e[0]+1][s[1]], num_vertical_elements, MPI_DOUBLE, nbrright, offset, num_vertical_elements, MPI_DOUBLE, win);
 
   offset = maxn + e[1] + 1;//We want to move 1 column in hence an offset of max n. We then want to get from e[1] + 1 up the column.
   MPI_Get(&x[s[0]][e[1]+1], 1, row_type, nbrup, offset, 1, row_type, win);
-  
+  MPI_Win_complete(win);
+  MPI_Win_wait(win);
+
+
+
+
+  MPI_Win_fence(0, win);
   //Use MPI_Put to get the ghost columns for the left and the down processors as we know the correct address to put the data into the ghost. 
   offset = s[1];
   MPI_Put(&x[e[0]][s[1]], num_vertical_elements, MPI_DOUBLE, nbrright, offset, num_vertical_elements, MPI_DOUBLE, win);
