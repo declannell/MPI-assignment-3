@@ -28,4 +28,4 @@ void exchangrma_2d(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
                  int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Comm comm);
 
 void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
-                 int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group neighbours);
+                 int nbrleft, int nbrright, int nbrup, int nbrdown, int myid, MPI_Group neighbours);

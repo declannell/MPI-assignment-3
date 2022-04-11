@@ -413,34 +413,32 @@ void exchangrma_2d(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
 
   MPI_Win_fence(0, win);
 }
-
+/*
 
 void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
                  int nbrleft, int nbrright, int nbrup, int nbrdown, MPI_Group neighbours) {
-  /* offset: avoid left ghost col and boundary condition value */
-  int num_vertical_elements = e[1] - s[1] + 1, num_horz_elements = e[0] - s[0] + 1; //This is the number of points shared across the boundary 
+  int  num_vertical_elements = e[1] - s[1] + 1, num_horz_elements = e[0] - s[0] + 1; //This is the number of points shared across the boundary 
 
   MPI_Datatype row_type;
   MPI_Type_vector(num_horz_elements, 1, maxn, MPI_DOUBLE, &row_type); // We have to skip maxn as this is actually the size of the grid, not nx + 2.
   MPI_Type_commit(&row_type);
-
-
 
   //between two processors.
   MPI_Aint offset;
   // GET  from the right and above the ghost columns as we don't know the correct offsets to use puts.
   MPI_Win_post(neighbours, 0, win);
   MPI_Win_start(neighbours, 0, win);
-  offset = maxn + s[1];//same offset as 1d case
-  MPI_Get(&x[e[0]+1][s[1]], num_vertical_elements, MPI_DOUBLE, nbrright, offset, num_vertical_elements, MPI_DOUBLE, win);
+  //does this fail for the processes with nbrright == MPI_PROC_NULL???
+  if (nbrright != MPI_PROC_NULL) {
+  	offset = maxn + s[1];//same offset as 1d case
+  	MPI_Get(&x[e[0]+1][s[1]], num_vertical_elements, MPI_DOUBLE, nbrright, offset, num_vertical_elements, MPI_DOUBLE, win);
 
-  offset = maxn + e[1] + 1;//We want to move 1 column in hence an offset of max n. We then want to get from e[1] + 1 up the column.
-  MPI_Get(&x[s[0]][e[1]+1], 1, row_type, nbrup, offset, 1, row_type, win);
+	  offset = maxn + e[1] + 1;//We want to move 1 column in hence an offset of max n. We then want to get from e[1] + 1 up the column.
+ 	 MPI_Get(&x[s[0]][e[1]+1], 1, row_type, nbrup, offset, 1, row_type, win);
+  }
+
   MPI_Win_complete(win);
   MPI_Win_wait(win);
-
-
-
 
   MPI_Win_fence(0, win);
   //Use MPI_Put to get the ghost columns for the left and the down processors as we know the correct address to put the data into the ghost. 
@@ -452,6 +450,39 @@ void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win wi
 
   MPI_Win_fence(0, win);
 
+}
+*/
+
+
+void exchangrma_2d_pscw(double x[][maxn], int nx, int s[2], int e[2], MPI_Win win,
+                 int nbrleft, int nbrright, int nbrup, int nbrdown, int myid, MPI_Group neighbours) {
+
+  MPI_Aint offset;
+  // GET  from the right and above the ghost columns as we don't know the correct offsets to use puts.
+  if (myid == 1) {
+  	 MPI_Win_post(neighbours, 0, win);
+     MPI_Win_wait(win);
+  } else if (myid == 0) {
+     MPI_Win_start(neighbours, 0, win);
+     offset = maxn + 1;//same offset as 1d case
+  	 MPI_Get(&x[e[0]+1][1], nx, MPI_DOUBLE, nbrright, offset, nx, MPI_DOUBLE, win);
+
+	 offset = 1;//We want to move 1 column in hence an offset of max n. We then want to get from e[1] + 1 up the column.
+	 MPI_Put(&x[e[0]][1], nx, MPI_DOUBLE, nbrright, offset, nx, MPI_DOUBLE, win);
+     MPI_Win_complete(win);
+  }
+
+  /*
+  MPI_Win_fence(0, win);
+  
+  //Use MPI_Put to get the ghost columns for the left and the down processors as we know the correct address to put the data into the ghost. 
+  offset = s[1];
+
+  offset = maxn + e[1];//We want to move 1 column in hence an offset of max n. We then want to place this e[1] up the column.
+  MPI_Put(&x[s[0]][e[1]], 1, row_type, nbrup, offset, 1, row_type, win);//we make use of row_type and only pass 1 datatype.
+
+  MPI_Win_fence(0, win);
+  */
 }
 
 

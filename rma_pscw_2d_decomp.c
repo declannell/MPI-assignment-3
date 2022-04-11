@@ -114,27 +114,7 @@ int main(int argc, char **argv)
 
   MPI_Group neighbours;
   make_groups(MPI_COMM_WORLD, &neighbours, nbrright, nbrleft, myid);
-  MPI_Comm_group(MPI_COMM_WORLD, &neighbours);
 
-/*
-  MPI_Comm_group(MPI_COMM_WORLD, &all_procs);
-  if (nbrright != MPI_PROC_NULL) {
-  	  int ranks[1] = {nbrright};
- 	  printf("ranks[0] = %d, processor =%d\n", ranks[0], myid);
-      MPI_Group_incl(all_procs, 1, ranks, &edits);
-  } else { //The boundary is to the right of this processor
-	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, &edits);
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  if (nbrleft != MPI_PROC_NULL) {
-  	  int ranks[1] = {nbrleft};
- 	  printf("ranks[0] = %d, processor =%d\n", ranks[0], myid);
-      MPI_Group_incl(all_procs, 1, ranks, &edited_by);
-  } else { //The boundary is to the left of this processor
-	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, &edited_by);
-  }
-*/
   int group_size;
   MPI_Group_size(neighbours, &group_size);
   printf("My group size is  %d for processor %d\n", group_size, myid);
@@ -143,13 +123,13 @@ int main(int argc, char **argv)
 
     // update b using a 
     //print_in_order(a, MPI_COMM_WORLD, nx);
-    exchangrma_2d_pscw(a, ny, s, e, wina, nbrleft, nbrright, nbrup, nbrdown, neighbours);
+    exchangrma_2d_pscw(a, ny, s, e, wina, nbrleft, nbrright, nbrup, nbrdown,myid, neighbours);
     //print_in_order(a, MPI_COMM_WORLD, nx);
     sweep2d(a, f, nx, s, e, b);
     //print_in_order(b, MPI_COMM_WORLD, nx);
 
     // update a using b 
-    exchangrma_2d_pscw(b, ny, s, e, winb, nbrleft, nbrright, nbrup, nbrdown, neighbours);
+    exchangrma_2d_pscw(b, ny, s, e, winb, nbrleft, nbrright, nbrup, nbrdown, myid, neighbours);
     //print_in_order(b, MPI_COMM_WORLD, nx);
     sweep2d(b, f, nx, s, e, a);
     //print_in_order(a, MPI_COMM_WORLD, nx);
@@ -382,7 +362,7 @@ void analytic_grid(double analytic[][maxn], int nx, int ny) {
 	}
   }
 
-
+/*
 void make_groups(MPI_Comm comm, MPI_Group *neighbours, int nbrright, int nbrleft, int myid){
   MPI_Group all_procs;
   
@@ -400,7 +380,20 @@ void make_groups(MPI_Comm comm, MPI_Group *neighbours, int nbrright, int nbrleft
 	  MPI_Group_union(MPI_GROUP_EMPTY, MPI_GROUP_EMPTY, neighbours);
   }
 }
+*/
 
+void make_groups(MPI_Comm comm, MPI_Group *neighbours, int nbrright, int nbrleft, int myid){
+  MPI_Group all_procs;
+  
+  MPI_Comm_group(comm, &all_procs);
+  if (myid == 0) {
+  	  int ranks[1] = {nbrright};
+      MPI_Group_incl(all_procs, 1, ranks, neighbours);
+  } else if (myid == 1) { //The boundary is to the right of this processor
+	  int ranks[1] = {nbrleft};
+      MPI_Group_incl(all_procs, 1, ranks, neighbours);
+  } 
+}
 
 void gather_grid_2d( double a[][maxn], int nx, int size, int myid, int s[2], int e[2], MPI_Comm comm) {
 	int i, j, k;
