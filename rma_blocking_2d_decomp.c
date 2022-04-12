@@ -155,7 +155,7 @@ int main(int argc, char **argv)
 
   //print_in_order(a, MPI_COMM_WORLD, nx);
   if(nprocs == 1){
-    print_grid_to_file("gridnb", a,  nx, ny);
+    //print_grid_to_file("gridnb", a,  nx, ny);
     print_full_grid(a, nx);
   }
 
@@ -176,6 +176,7 @@ int main(int argc, char **argv)
   if (myid == 0) {
 	printf(" The converged grid on rank 0 is \n");
 	print_full_grid(a, nx);
+    print_grid_to_file("rma_blocking_2D.txt", a, nx, ny);
   }
 
  MPI_Finalize();

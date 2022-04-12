@@ -21,18 +21,7 @@ void print_in_order(double x[][maxn], MPI_Comm comm, int nx);
 void  print_grid_to_file(char *fname, double x[][maxn], int nx, int ny);
 void analytic_grid(double analytic[][maxn], int nx, int ny);
 void gather_grid_2d( double a[][maxn], int nx, int size, int myid, int s[2], int e[2], MPI_Comm comm);
-void make_groups(MPI_Comm comm, MPI_Group *edits, MPI_Group *edited_by, int nbrright, int nbrleft, int nbrup, int nbrdown, int myid);
-
-
-typedef struct 
-{
-  int ex;
-  int ey;
-  int sx;
-  int sy;
-} Start_End_Coords;
-
-
+void make_groups(MPI_Comm comm, MPI_Group edits[2], MPI_Group edited_by[2], int nbrright, int nbrleft, int nbrup, int nbrdown, int myid);
 
 int main(int argc, char **argv)
 {
@@ -112,9 +101,9 @@ int main(int argc, char **argv)
   MPI_Win_create(&b[s[0]-1][0], (maxn)*(e[0] - s[0] + 3)*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &winb);
   glob_diff = 1000;
 
-  MPI_Group edits, edited_by;
-  //make_groups(MPI_COMM_WORLD, &edits, &edited_by, nbrright, nbrleft, nbrup, nbrdown, myid);
-  
+  MPI_Group edits[2], edited_by[2]; //this will store what process myid will edit and be editted by. The function make_groups does this.
+  make_groups(MPI_COMM_WORLD, edits, edited_by, nbrright, nbrleft, nbrup, nbrdown, myid);
+
   for(it=0; it < maxit; it++){
 
     // update b using a 
@@ -159,7 +148,7 @@ int main(int argc, char **argv)
 
   //print_in_order(a, MPI_COMM_WORLD, nx);
   if(nprocs == 1){
-    print_grid_to_file("gridnb", a,  nx, ny);
+    //print_grid_to_file("gridnb", a,  nx, ny);
     print_full_grid(a, nx);
   }
 
@@ -180,6 +169,7 @@ int main(int argc, char **argv)
   if (myid == 0) {
 	printf(" The converged grid on rank 0 is \n");
 	print_full_grid(a, nx);
+    print_grid_to_file("rma_pscw_2D.txt", a, nx, ny);
   }
  MPI_Finalize();
  return 0;
@@ -375,48 +365,36 @@ void make_groups(MPI_Comm comm, MPI_Group *edits, MPI_Group *edited_by, int nbrr
 }
 */
 
-void make_groups(MPI_Comm comm, MPI_Group *edits, MPI_Group *edited_by, int nbrright, int nbrleft, int nbrup, int nbrdown, int myid){
+void make_groups(MPI_Comm comm, MPI_Group edits[2], MPI_Group edited_by[2], int nbrright, int nbrleft, int nbrup, int nbrdown, int myid){
   MPI_Group all_procs;
 
   MPI_Comm_group(comm, &all_procs);//This is a group containing all processors in MPI_COMM_WORLD
-  //these 3 if statements determine which processes myid will access the memory of
-  if (nbrright != MPI_PROC_NULL && nbrup != MPI_PROC_NULL) {
-	  printf("myid  is %d, my right neighbour is %d, my top neighbour is %d\n", myid, nbrright, nbrup);
-  	  int ranks[2] = {nbrright, nbrup};
-      MPI_Group_incl(all_procs, 2, ranks, edits);//edits is already a pointer to the group object edits
+
+  if (nbrright != MPI_PROC_NULL) {//This ensures to the right of myid is not a boundary. Processors will access memory to the right.
+      //printf("myid  is %d, my right neighbour is %d\n", myid, nbrright);
+      int ranks[1] = {nbrright};
+      MPI_Group_incl(all_procs, 1, ranks, edits);//edits is already a pointer to the first element of arrays edits
   }
 
-  if (nbrright != MPI_PROC_NULL && nbrup == MPI_PROC_NULL) {//In this case the top neigbour is a boundary.
-	  printf("myid  is %d, my right neighbour is %d, my top neighbour is %d\n", myid, nbrright, nbrup);
-  	  int ranks[1] = {nbrright};
-      MPI_Group_incl(all_procs, 1, ranks, edits);
-  }
-
-  if (nbrright == MPI_PROC_NULL && nbrup != MPI_PROC_NULL) {//In this case the rigt neighbour is a boundary
-      printf("myid  is %d, my right neighbour is %d, my top neighbour is %d\n", myid, nbrright, nbrup);
-  	  int ranks[1] = {nbrup};
-      MPI_Group_incl(all_procs, 1, ranks, edits);
-  }
-
-  //We now have set the group for each process can access the memory of myid
-
-  if (nbrleft != MPI_PROC_NULL && nbrdown != MPI_PROC_NULL) { //The boundary is to the right of this processor
-	  printf("myid  is %d, my left neighbour is %d, my bottom neighbour is %d\n", myid, nbrleft, nbrdown);
-      int ranks[2] = {nbrleft, nbrdown};
-      MPI_Group_incl(all_procs, 2, ranks, edited_by);//edited_by is already a pointer to the group object edtied_by
-  }
-
-  if (nbrleft != MPI_PROC_NULL && nbrdown == MPI_PROC_NULL) {//the bottom neighbour is a boundary
-	  printf("myid  is %d, my left neighbour is %d, my bottom neighbour is %d\n", myid, nbrleft, nbrdown);
+  if (nbrleft != MPI_PROC_NULL) { //The ensures to the left of myid is not a boundary. Processors will be accessed by the left.
+      //printf("myid  is %d, my down  neighbour is %d\n", myid, nbrleft);
       int ranks[1] = {nbrleft};
-      MPI_Group_incl(all_procs, 1, ranks, edited_by);
+      MPI_Group_incl(all_procs, 1, ranks, edited_by);//edited_by is already a pointer to the first element of the array edtied_by
   }
 
-  if (nbrleft == MPI_PROC_NULL && nbrdown != MPI_PROC_NULL) {//the left neighbour is a boundary
-	  printf("myid  is %d, my left neighbour is %d, my bottom neighbour is %d\n", myid, nbrleft, nbrdown);
-      int ranks[1] = {nbrdown};
-      MPI_Group_incl(all_procs, 1, ranks, edited_by);
+ if (nbrup != MPI_PROC_NULL) {//This ensure above myid is not a boundary. Processors will access memory of the processor above.
+      //printf("myid  is %d, my up neighbour is %d\n", myid, nbrup);
+      int ranks[1] = {nbrup};
+      MPI_Group_incl(all_procs, 1, ranks, &edits[1]);
   }
+
+  if (nbrdown != MPI_PROC_NULL) { //The ensures below myid is not a  boundary. Processors are accessed from below.
+      //printf("myid  is %d, my down  neighbour is %d\n", myid, nbrdown);
+      int ranks[1] = {nbrdown};
+      MPI_Group_incl(all_procs, 1, ranks, &edited_by[1]);
+  }
+
+
 }
 
 void gather_grid_2d( double a[][maxn], int nx, int size, int myid, int s[2], int e[2], MPI_Comm comm) {
